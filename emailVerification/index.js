@@ -1,96 +1,94 @@
 /**
  * @author slow_bear
- * @version 1.0
  * @fileoverview Processing user email verification
- * @requires module:database/mysql
- * @requires module:utils/createResponse
- * @requires module:utils/emailRegex
  */
 const mysql = require('../database');
-const { createResponse, emailRegex } = require('../Shared/utils');
+const { createResponse } = require('../Shared/utils');
+const { authenticateJWT } = require('../Shared/security/jwtProvider');
+const { CustomError } = require('../Shared/middleware/errorHandler');
 
 const MS_SECONDS_IN_A_DAY = 86400000;
+const VERIFIED = 'Y';
+const EXPIRED_JWT = 'EXPIRED_JWT';
 
-const getUserInfo = `SELECT email, verified, created_date, verification_url
+const getUserInfoQuery = `SELECT email, verified, created_date
 FROM Accounts
-WHERE email = ?`;
-const updateVerified = `UPDATE Accounts
-SET verified = 1
+WHERE id = ?`;
+const updateVerifiedQuery = `UPDATE Accounts
+SET verified = 'Y'
 WHERE email = ?`;
 
-const UpdateVerified = async (db, email) => {
-  await db.transaction()
-    .query(updateVerified, email)
-    .query((row) => {
-      if (row.affectedRows === 0) {
-        throw new Error({
-          code: 'The server occured error',
-        });
-      }
-    })
-    .rollback()
-    .commit();
-};
-
-const GetUserInfo = async (db, email) => {
-  const queryResult = await db.transaction()
-    .query(getUserInfo, email)
-    .query((row) => {
-      if (row.affectedRows === 0) {
-        throw new Error({
-          code: 'Given user email was invalid',
-        });
-      }
-    })
-    .rollback()
-    .commit();
-  return queryResult[0][0];
-};
 /**
-  * Processing user sing up
-  * @requires module:mysql
-  * @requires module:utils/createResponse
-  * @requires module:utils/emailRegex
-  * @param {object} context Azure functions object
-  * @param {object} req http request
-  * @returns {object} Processing result
-  */
+ * Update verified
+ * @param {Object} db Mysql
+ * @param {string} email Plan email text
+ */
+const updateVerified = async (db, email) => {
+  await db.transaction()
+    .query(updateVerifiedQuery, email)
+    .query((row) => {
+      if (row.affectedRows < 1) {
+        throw new CustomError('INTERNAL_SERVER_ERROR', 'SQL execute error');
+      }
+    })
+    .commit();
+};
+
+/**
+ * Get user information
+ * @param {object} db Mysql
+ * @param {number} id Plan id
+ * @returns {object} Processing result
+ */
+const getUserInfo = async (db, id) => {
+  const queryResult = await db.query(getUserInfoQuery, id);
+  return queryResult[0];
+};
+
 module.exports = async (context, req) => {
-  const { emailToken } = context.bindingData;
-  const email = req.query.user;
-  // email 형식이 올바르지 않을 경우
-  if (!emailRegex(email)) {
-    context.res = createResponse(403, 'INVALID_EMAIL', 'Given user email was invalid');
+  let decodedToken = {};
+  try {
+    decodedToken = await authenticateJWT(req);
+  } catch (error) {
+    if (error.error === EXPIRED_JWT) {
+      context.res = createResponse(500, error.error, error.message, 900);
+    } else {
+      context.res = createResponse(500, error.error, error.message, 902);
+    }
+
     context.done();
     return;
   }
 
+  const { id } = decodedToken;
   try {
     await mysql.connect();
   } catch (error) {
-    context.res = createResponse(500, 'SERVER_ERROR', error.code);
-    context.done(error);
+    context.res = createResponse(500, 'INTERNAL_SERVER_ERROR', error.message, 500);
+    context.done();
     return;
   }
 
-  const user = await GetUserInfo(mysql, email)
-    .catch((error) => {
-      mysql.quit();
-      context.res = createResponse(500, 'SERVER_ERROR', error.code);
-      context.done(error);
-    });
-  // 이미 인증된 이메일인지 확인
-  if (user.verified === 1) {
+  let user = {};
+  try {
+    user = await getUserInfo(mysql, id);
+  } catch (error) {
     mysql.quit();
-    context.res = createResponse(403, 'ALREADY_VERIFIED', 'Given user already verified');
-    context.done('ALREADY_VERIFIED');
+    context.res = createResponse(500, 'INTERNAL_SERVER_ERROR', error.message, 500);
+    context.done();
     return;
   }
-  // 인증 이메일 일치 확인
-  if (user.verification_url !== emailToken) {
+
+  if (!user) {
     mysql.quit();
-    context.res = createResponse(403, 'INVALID_VERIFICATION', 'Not matched user email and verification url');
-    context.done('INVALID_VERIFICATION');
+    context.res = createResponse(403, 'NOT_A_MEMBER', 'Given user was not a member', 900);
+    context.done();
+    return;
+  }
+  if (user.verified === VERIFIED) {
+    mysql.quit();
+    context.res = createResponse(403, 'ALREADY_VERIFIED', 'Given user already verified', 900);
+    context.done();
     return;
   }
   // 유효시간 지났는지 확인
@@ -98,19 +96,21 @@ module.exports = async (context, req) => {
   const currentTime = new Date().getTime();
   if (currentTime > expiredTime) {
     mysql.quit();
-    context.res = createResponse(403, 'INVALID_VERIFICATION', 'Given verification was expired');
-    context.done('INVALID_VERIFICATION');
+    context.res = createResponse(403, 'INVALID_VERIFICATION', 'Given verification was expired', 900);
+    context.done();
     return;
   }
 
   try {
-    await UpdateVerified(mysql, email);
+    await updateVerified(mysql, user.email);
   } catch (error) {
     mysql.quit();
-    context.res = createResponse(500, 'SERVER_ERROR', error.code);
-    context.done(error);
+    context.res = createResponse(500, 'INTERNAL_SERVER_ERROR', error.message, 500);
+    context.done();
+    return;
   }
 
   mysql.quit();
+  context.res = createResponse(200, '', '', 200);
   context.done();
 };

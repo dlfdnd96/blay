@@ -36,9 +36,9 @@ class Email {
   google({ id, password }) {
     const transporter = nodemailer.createTransport({
       service: 'gmail',
-      port: 587,
+      port: 456,
       host: 'smtp.gmail.com',
-      secure: false,
+      secure: true,
       requireTLS: true,
       auth: {
         user: id,
