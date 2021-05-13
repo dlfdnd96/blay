@@ -2,12 +2,12 @@
 
 ---
 
-**MySQL Docker 사용 방법**
-# 준비 사항
+# MySQL Docker 사용 방법
+## 준비 사항
 * Docker 설치
 
-# 사용 방법
-## Docker 설정
+## 사용 방법
+### Docker 설정
 처음 사용자는 docker 환경을 설정해야 합니다.
 1. docker-entrypoint.sh를 실행 파일로 변경합니다.
 ```
@@ -52,7 +52,7 @@ docker container restart CONTAINER_NAME
 docker container logs CONTAINER_NAME
 ```
 
-# 실행 환경
+## 실행 환경
 * Docker: 20.10.2, build 2291f61
 * OS: Ubuntu 18.04 (WSL2)
 
