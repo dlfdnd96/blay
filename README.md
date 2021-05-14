@@ -1,63 +1,10 @@
 **사이드 프로젝트를 쉽게 운영할 수 있게 도와주는 서비스, Blay**
 
 ---
-
-# MySQL Docker 사용 방법
-## 준비 사항
-* Docker 설치
-
-## 사용 방법
-### Docker 설정
-처음 사용자는 docker 환경을 설정해야 합니다.
-1. docker-entrypoint.sh를 실행 파일로 변경합니다.
-```
-chmod +x docker-entrypoint.sh
-```
-2. docker image를 build 합니다. 여기서 image 태그(이름)는 blay_mysql로 하겠습니다.
-```
-docker build -t blay_mysql .
-```
-3. image가 제대로 build 됐는지 확인합니다. REPOSITORY 항목에 설정한 태그 이름이 있으면 됩니다.
-```
-docker image ls
-```
-4. container를 생성한 후 실행합니다. 여기서 container 이름(--name 뒤)은 blay_mysql로 하겠습니다. 비밀번호(MYSQL_ROOT_PASSWORD)는 원하는 것으로 하면 됩니다. -d 뒤에 image 태그(이름)를 작성하면 됩니다.
-```
-docker run -p 3306:3306 --name blay_mysql -e MYSQL_ROOT_PASSWORD='YOUR_PASSWORD' -d blay_mysql --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
-```
-5. container가 제대로 실행됐는지 확인합니다. 컨테이너의 NAMES 항목이 설정한 이름이고 STATUS 항목에 UP으로 표시되면 됩니다.
-```
-docker container ls
-```
-6. mysql_init.sql을 생성한 container에 적용합니다.
-```
-docker exec -i blay_mysql sh -c 'exec mysql -uroot -p"YOUR_PASSWORD"' < ./mysql_init.sql
-```
-
-## Docker 명령어
-* container 시작
-```
-docker container start CONTAINER_NAME
-```
-* container 중지
-```
-docker container stop CONTAINER_NAME
-```
-* container 재시작
-```
-docker container restart CONTAINER_NAME
-```
-* container 로그
-```
-docker container logs CONTAINER_NAME
-```
-
-## 실행 환경
-* Docker: 20.10.2, build 2291f61
-* OS: Ubuntu 18.04 (WSL2)
+# 백엔드 구조
+![backend_architecture.png](./img/backend_architecture.png)
 
 ---
-
 # REST API Reference
 * Servers:
   * Production server: https://some.app.server
@@ -260,7 +207,7 @@ Request 받은 아이디(email), 비밀번호(password), 약관(termsAndConditio
 }
 ```
 
-# HTTP status sub code
+## HTTP status sub code
 기존의 HTTP 상태 코드에서 백엔드 수행 결과를 좀 더 세부적으로 전송하기 위한 필드입니다.
 | Status | Description |
 |--|--|
@@ -270,7 +217,6 @@ Request 받은 아이디(email), 비밀번호(password), 약관(termsAndConditio
 | 902 | JWT 인증 중 에러가 발생한 경우입니다.
 
 ---
-
 # 개발 방법론
 blay는 특수한 상황으로부터 발생하는 특수한 문제들이 있습니다. 테크 스택의 통일이 안 된다는 문제부터 서로 동시간대에 일하고 있지 않을 가능성이 더 높다는 점, 언제든지 인원 변동이 있을 수 있다는 점, 그리고 그 와중에 스타트업의 장점을 살려서 언제든지 기민하게 반응할 수 있는 개발 구조를 가져야 한다는 점이 있습니다.
 
@@ -278,3 +224,58 @@ blay는 특수한 상황으로부터 발생하는 특수한 문제들이 있습�
 * 결합도를 극단적으로 낮추어 각 엔드포인트의 코드가 서로 맞물려있는 다른 코드가 전혀 없기 때문에 한 엔드포인트가 고장이 났을 때 딱 그 파일 하나만 봐서 고칠 수 있는 장점이 있으며, 새로운 인원이 들어왔을 때 서버의 작동 방식을 이해하기 위해 코드베이스 전체를 봐야 할 필요 없이 엔드포인트 하나만 보면 됩니다. 
 * 작업 중인 인원이 나갔을 때 최악의 케이스로 잃는 코드가 많아 봤자 한 파일 수준이며, 개발 중인 다른 작업물을 기다려야만 작업을 진행할 수 있는 상황이 사라집니다.
 * 새로운 API가 개발되어야 하거나 기존 API에 큰 변경 사항이 있어야 할 때 이 한 줄을 고치는 게 서버 전체를 고장 내는 상황들을 방지 할 수 있어 더욱 기민한 반응이 가능한 구조입니다.
+
+---
+# MySQL Docker 사용 방법
+## 준비 사항
+* Docker 설치
+
+## 사용 방법
+### Docker 설정
+처음 사용자는 docker 환경을 설정해야 합니다.
+1. docker-entrypoint.sh를 실행 파일로 변경합니다.
+```
+chmod +x docker-entrypoint.sh
+```
+2. docker image를 build 합니다. 여기서 image 태그(이름)는 blay_mysql로 하겠습니다.
+```
+docker build -t blay_mysql .
+```
+3. image가 제대로 build 됐는지 확인합니다. REPOSITORY 항목에 설정한 태그 이름이 있으면 됩니다.
+```
+docker image ls
+```
+4. container를 생성한 후 실행합니다. 여기서 container 이름(--name 뒤)은 blay_mysql로 하겠습니다. 비밀번호(MYSQL_ROOT_PASSWORD)는 원하는 것으로 하면 됩니다. -d 뒤에 image 태그(이름)를 작성하면 됩니다.
+```
+docker run -p 3306:3306 --name blay_mysql -e MYSQL_ROOT_PASSWORD='YOUR_PASSWORD' -d blay_mysql --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+```
+5. container가 제대로 실행됐는지 확인합니다. 컨테이너의 NAMES 항목이 설정한 이름이고 STATUS 항목에 UP으로 표시되면 됩니다.
+```
+docker container ls
+```
+6. mysql_init.sql을 생성한 container에 적용합니다.
+```
+docker exec -i blay_mysql sh -c 'exec mysql -uroot -p"YOUR_PASSWORD"' < ./mysql_init.sql
+```
+
+## Docker 명령어
+* container 시작
+```
+docker container start CONTAINER_NAME
+```
+* container 중지
+```
+docker container stop CONTAINER_NAME
+```
+* container 재시작
+```
+docker container restart CONTAINER_NAME
+```
+* container 로그
+```
+docker container logs CONTAINER_NAME
+```
+
+## 실행 환경
+* Docker: 20.10.2, build 2291f61
+* OS: Ubuntu 18.04 (WSL2)
