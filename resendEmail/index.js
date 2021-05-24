@@ -90,59 +90,51 @@ const get24hResetEmailCount = async (db, email) => {
 /**
   * Send password reset email
   * @param {string} email Plane email text
-  * @returns {Array} Response result
   */
 const sendPasswordResetEmail = async (email) => {
-  const result = [];
-  try {
-    await mysql.connect();
-  } catch (error) {
-    result.push(500, 'INTERNAL_SERVER_ERROR', error.message, 500);
-    return result;
-  }
+  // await mysql.connect().catch((e) => {
+  //   throw new CustomError(500, 'INTERNAL_SERVER_ERROR', 500, e.message);
+  // });
+  const temp = async () => mysql.connect();
+  context.log(temp);
 
   // 24시간안에 3번 이상 보냈는지 확인
   const resetEmail = await get24hResetEmailCount(mysql, email);
   if (resetEmail.length > 0 && resetEmail[0].count >= 3) {
     mysql.quit();
-    result.push(403, 'INVALID_DEMAND', 'Too many attempts to reset your password', 900);
-    return result;
+    throw new CustomError(403, 'INVALID_DEMAND', 900, 'Too many attempts to reset your password', 900);
   }
 
-  try {
-    await insertResetEmailAccount(mysql, email);
-  } catch (error) {
+  await insertResetEmailAccount(mysql, email).catch((e) => {
     mysql.quit();
-    result.push(500, 'INTERNAL_SERVER_ERROR', error.message, 500);
-    return result;
-  }
+    throw new CustomError(500, 'INTERNAL_SERVER_ERROR', 500, e.message);
+  });
 
-  const emailResult = await sendEmail(email, PASSWORD_RESET_CATEGORY);
-  if (emailResult.length > 0) {
-    try {
-      await deleteResetEmailAccount(mysql, email);
-    } catch (error) {
+  await sendEmail(email, PASSWORD_RESET_CATEGORY).catch(async (e) => {
+    await deleteResetEmailAccount(mysql, email).catch((de) => {
       mysql.quit();
-      result.push(500, 'INTERNAL_SERVER_ERROR', error.message, 500);
-      return result;
-    }
+      throw new CustomError(500, 'INTERNAL_SERVER_ERROR', 500, de.message);
+    });
 
-    result.push(...emailResult);
-    return result;
-  }
+    mysql.quit();
+    throw new CustomError(500, 'INTERNAL_SERVER_ERROR', 901, e.message);
+  });
 
   mysql.quit();
-  return result;
 };
 
+const isPasswordReset = (token) => token === undefined;
+
 module.exports = async (context, req) => {
-  const { token } = req.body;
-  if (!token) {
+  if (isPasswordReset(req.body.token)) {
     const { email } = req.body;
-    const emailResult = await sendPasswordResetEmail(email);
-    if (emailResult.length > 0) {
-      context.res = createResponse(...emailResult);
-      context.done();
+    try {
+      await sendPasswordResetEmail(email);
+    } catch (e) {
+      if (e instanceof CustomError) {
+        context.res = createResponse(e.status, e.error, e.message, e.rescode);
+      }
+
       return;
     }
   } else {
@@ -195,5 +187,4 @@ module.exports = async (context, req) => {
   }
 
   context.res = createResponse(200, '', '', 200);
-  context.done();
 };

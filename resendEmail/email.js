@@ -5,6 +5,7 @@
 const nodemailer = require('nodemailer');
 const path = require('path');
 const mjmlUtils = require('mjml-utils');
+const { CustomError } = require('../Shared/middleware/errorHandler');
 
 const VERIFICATION_EMAIL_CONTENT_PATH = 'public/welcome.html';
 const PASSWORD_RESET_EMAIL_CONTENT_PATH = 'public/reset_password.html';
@@ -57,7 +58,6 @@ const sendEmail = async (email, category) => {
   const filePath = category === PASSWORD_RESET_CATEGORY
     ? PASSWORD_RESET_EMAIL_CONTENT_PATH
     : VERIFICATION_EMAIL_CONTENT_PATH;
-  const result = [];
   try {
     const emailPath = path.join(__dirname, filePath);
     let content = '';
@@ -84,12 +84,9 @@ const sendEmail = async (email, category) => {
         subject: emailSubject,
         html: content,
       });
-  } catch (error) {
-    result.push(500, 'INTERNAL_SERVER_ERROR', error.message, 901);
-    return result;
+  } catch (e) {
+    throw new CustomError(500, 'INTERNAL_SERVER_ERROR', 901, e.message);
   }
-
-  return result;
 };
 
 module.exports = {
