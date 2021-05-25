@@ -8,6 +8,7 @@ const { CustomError } = require('../Shared/middleware/errorHandler');
 const { sendEmail } = require('./email');
 const { authenticateJWT } = require('../Shared/security/jwtProvider');
 
+// 커링 가능?
 const getResponse = async (error = undefined) => {
   if (!error) {
     return createResponse(200, '', '', 200);
