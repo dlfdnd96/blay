@@ -8,18 +8,15 @@ const { CustomError } = require('../Shared/middleware/errorHandler');
 const { sendEmail } = require('./email');
 const { authenticateJWT } = require('../Shared/security/jwtProvider');
 
-// 커링 가능?
-const getResponse = async (error = undefined) => {
-  if (!error) {
-    return createResponse(200, '', '', 200);
-  }
-
+const getErrorResponse = async (error) => {
   if (error instanceof CustomError) {
     return createResponse(error.status, error.error, error.message, error.rescode);
   }
 
   return createResponse(500, 'INTERNAL_SERVER_ERROR', error.message, 500);
 };
+
+const getSuccessResponse = async () => createResponse(200, '', '', 200);
 
 /**
   * Get count of requesting reset email in 24 hours
@@ -106,11 +103,8 @@ module.exports = async (context, req) => {
       await sendPasswordResetEmail(email);
       await disconnectMysql();
     } catch (e) {
-      if (mysql.getClient()) {
-        await disconnectMysql();
-      }
-
-      context.res = await getResponse(e);
+      await disconnectMysql();
+      context.res = await getErrorResponse(e);
       return;
     }
   } else {
@@ -125,10 +119,10 @@ module.exports = async (context, req) => {
         await disconnectMysql();
       }
 
-      context.res = await getResponse(e);
+      context.res = await getErrorResponse(e);
       return;
     }
   }
 
-  context.res = await getResponse();
+  context.res = await getSuccessResponse();
 };
