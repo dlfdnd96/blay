@@ -9,7 +9,11 @@ module.exports = {
     context: 'readonly',
   },
   extends: [
-    'airbnb-base',
+    'airbnb-typescript',
+  ],
+  parser: '@typescript-eslint/parser',
+  plugins: [
+    '@typescript-eslint',
   ],
   parserOptions: {
     ecmaVersion: 12,

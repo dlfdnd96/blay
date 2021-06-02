@@ -17,8 +17,6 @@
     "resetPassword/*.ts",
     "Shared/*.ts",
     "signUp/*.ts",
-    "HttpTrigger1/*.ts",
-    "HttpTrigger2/*.ts"
   ],
   "exclude": [
     "node_modules"
