@@ -4,7 +4,7 @@
  */
 const bcrypt = require('bcrypt');
 const path = require('path');
-const mjmlUtils = require('mjml-utils');
+const fs = require('fs');
 
 const mysql = require('../database');
 const Email = require('./Email');
@@ -128,6 +128,17 @@ const getLatestResetEmail = async (db, email) => {
   return queryResult;
 };
 
+const injectDataToEmail = (template, vars = {}) => {
+  const fileContent = fs.readFileSync(template, 'utf8');
+  let finalTemplate = fileContent;
+  Object.keys(vars).forEach((key) => {
+    const regex = new RegExp(`{${key}}`, 'g');
+    finalTemplate = finalTemplate.replace(regex, vars[key]);
+  });
+
+  return finalTemplate;
+};
+
 /**
   * Setting up password reset email and send it
   * @requires nodemailer
@@ -138,17 +149,9 @@ const sendEmail = async (email) => {
   const result = [];
   try {
     const emailPath = path.join(__dirname, EMAIL_CONTENT_PATH);
-    let emailContent = '';
-    if (process.env.NODE_ENV === 'production') {
-      emailContent = await mjmlUtils.inject(emailPath, {
-        findPasswordUrl: `${process.env.PRODUCTION_HOST_FRONT_URL}/${EMAIL_SET_PASSWORD_URI}`,
-      });
-    } else {
-      emailContent = await mjmlUtils.inject(emailPath, {
-        findPasswordUrl: `${process.env.TEST_HOST_FRONT_URL}/${EMAIL_SET_PASSWORD_URI}`,
-      });
-    }
-
+    const emailContent = injectDataToEmail(emailPath, {
+      findPasswordUrl: `${process.env.HOST_FRONT_URL}/${EMAIL_SET_PASSWORD_URI}`,
+    });
     const resetPasswordEmail = new Email({
       to: email,
       from: process.env.GMAIL_USER,
