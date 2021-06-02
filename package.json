@@ -11,7 +11,8 @@
     "dev": "func host start",
     "deploy": "func azure functionapp publish blay",
     "test-deploy": "func azure functionapp publish blay-test",
-    "build": "tsc"
+    "build": "tsc",
+    "watch": "tsc -w"
   },
   "dependencies": {
     "bcrypt": "^5.0.0",
@@ -22,6 +23,7 @@
     "serverless-mysql": "^1.5.4"
   },
   "devDependencies": {
+    "@azure/functions": "^1.2.3",
     "@types/node": "^15.6.2",
     "eslint": "^7.19.0",
     "eslint-config-airbnb-base": "^14.2.1",
