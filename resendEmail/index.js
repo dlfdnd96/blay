@@ -94,34 +94,25 @@ const sendVerificationEmail = async (id) => {
 
 module.exports = async (context, req) => {
   const isPasswordReset = (token) => token === undefined;
-  const connectMysql = async () => mysql.connect();
   const disconnectMysql = async () => mysql.quit();
-  if (isPasswordReset(req.body.token)) {
-    const { email } = req.body;
-    try {
-      await connectMysql();
+  try {
+    if (isPasswordReset(req.body.token)) {
+      const { email } = req.body;
       await sendPasswordResetEmail(email);
-      await disconnectMysql();
-    } catch (e) {
-      await disconnectMysql();
-      context.res = await getErrorResponse(e);
-      return;
-    }
-  } else {
-    try {
+    } else {
       const decodedToken = await authenticateJWT(req);
       const { id } = decodedToken;
-      await connectMysql();
       await sendVerificationEmail(id);
-      await disconnectMysql();
-    } catch (e) {
-      if (mysql.getClient()) {
-        await disconnectMysql();
-      }
-
-      context.res = await getErrorResponse(e);
-      return;
     }
+
+    await disconnectMysql();
+  } catch (e) {
+    if (mysql.getClient()) {
+      await disconnectMysql();
+    }
+
+    context.res = await getErrorResponse(e);
+    return;
   }
 
   context.res = await getSuccessResponse();
