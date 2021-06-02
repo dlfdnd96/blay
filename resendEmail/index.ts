@@ -2,6 +2,8 @@
  * @author slow_bear
  * @fileoverview Processing resend email
  */
+import { Context, HttpRequest } from "@azure/functions"
+
 const mysql = require('../database');
 const { createResponse } = require('../Shared/utils');
 const { CustomError } = require('../Shared/middleware/errorHandler');
@@ -92,7 +94,8 @@ const sendVerificationEmail = async (id) => {
   await sendEmail(user.email, verificationCategory);
 };
 
-module.exports = async (context, req) => {
+module.exports = async (context: Context, req: HttpRequest) => {
+  // TODO: 여기부터
   const isPasswordReset = (token) => token === undefined;
   const disconnectMysql = async () => mysql.quit();
   try {
