@@ -10,14 +10,15 @@
     "noImplicitAny": true
   },
   "include": [
-    "database/**/*.ts",
-    "emailVerification/**/*.ts",
-    "logIn/**/*.ts",
-    "resendEmail/**/*.ts",
-    "resetPassword/**/*.ts",
-    "Shared/**/*.ts",
-    "signUp/**/*.ts"
-, "resendEmail/index.js"  ],
+    "database/*.ts",
+    "emailVerification/*.ts",
+    "logIn/*.ts",
+    "resendEmail/*.ts",
+    "resetPassword/*.ts",
+    "Shared/*.ts",
+    "signUp/*.ts",
+    "resendEmail/index.js"
+  ],
   "exclude": [
     "node_modules"
   ]
