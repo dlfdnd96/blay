@@ -10,7 +10,8 @@
     "test": "jest --config=./jest.config.js",
     "dev": "func host start",
     "deploy": "func azure functionapp publish blay",
-    "test-deploy": "func azure functionapp publish blay-test"
+    "test-deploy": "func azure functionapp publish blay-test",
+    "build": "tsc"
   },
   "dependencies": {
     "bcrypt": "^5.0.0",
@@ -21,6 +22,7 @@
     "serverless-mysql": "^1.5.4"
   },
   "devDependencies": {
+    "@types/node": "^15.6.2",
     "eslint": "^7.19.0",
     "eslint-config-airbnb-base": "^14.2.1",
     "eslint-plugin-import": "^2.22.1",

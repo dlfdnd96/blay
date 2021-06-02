@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "lib": ["ES2015"],
+    "target": "es5",
+    "module": "commonjs",
+    "strict": true,
+    "sourceMap": true,
+    "outDir": "dist",
+    "removeComments": true,
+    "noImplicitAny": true
+  },
+  "include": [
+    "database/**/*.ts",
+    "emailVerification/**/*.ts",
+    "logIn/**/*.ts",
+    "resendEmail/**/*.ts",
+    "resetPassword/**/*.ts",
+    "Shared/**/*.ts",
+    "signUp/**/*.ts"
+, "resendEmail/index.js"  ],
+  "exclude": [
+    "node_modules"
+  ]
+}
