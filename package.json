@@ -6,13 +6,11 @@
     "start": "**.js"
   },
   "scripts": {
-    "start": "func host start",
-    "test": "jest --config=./jest.config.js",
-    "dev": "func host start",
-    "deploy": "func azure functionapp publish blay",
-    "test-deploy": "func azure functionapp publish blay-test",
     "build": "tsc",
-    "watch": "tsc -w"
+    "watch": "tsc -w",
+    "prestart": "npm run build",
+    "start": "func host start",
+    "test": "jest --config=./jest.config.js"
   },
   "dependencies": {
     "bcrypt": "^5.0.0",
@@ -24,7 +22,6 @@
   },
   "devDependencies": {
     "@azure/functions": "^1.2.3",
-    "@types/node": "^15.6.2",
     "@typescript-eslint/eslint-plugin": "^4.26.0",
     "@typescript-eslint/parser": "^4.26.0",
     "eslint": "^7.19.0",
