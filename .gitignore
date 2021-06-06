@@ -81,8 +81,5 @@ obj
 appsettings.json
 local.settings.json
 
-# VS Code
-.vscode
-
 # jest
 .jest
