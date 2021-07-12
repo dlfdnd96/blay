@@ -5,10 +5,6 @@
 ![backend_architecture.png](./img/backend_architecture.png)
 
 ---
-# REST API Reference
-* Servers:
-  * Production server: https://some.app.server
-  * Test server: https://some.app.server/test
 
 [여기](https://engineering.linecorp.com/ko/blog/document-engineering-api-documentation/)를 참고하여 만든 REST API 문서입니다.
 
@@ -27,6 +23,67 @@
 | error | string | 에러를 짧은 문장으로 표현합니다. (예: INTERNAL_SERVER_ERROR)
 | message | string | 에러에 대한 상세한 내용 혹은 JWT와 같은 결과값이 들어갑니다.
 | rescode | number | HTML 상태 코드에 대한 서브 코드입니다. [HTTP status sub code](#http-status-sub-code)를 참고하십시오.
+
+## 비밀번호 변경 PUT /auth/change-password
+Request 받은 이메일과 비밀번호를 이용하여 비밀번호를 변경합니다. 패스워드 변경이 성공하면 200 OK를 반환하고 비밀번호 변경 중 발생한 오류는 response 객체의 error, message 필드에 나타납니다.
+### Request parameters
+| Parameter | Type | Description
+|--|--|--
+| Apim-key(header) | string | Azure API Management 구독 키입니다. 이 필드는 Test API를 실행할 때만 필요합니다.
+| email(body) | string | 비밀번호 변경을 수행하는 사용자 이메일입니다.
+| password(body) | string | 비밀번호 변경을 수행하는 사용자 비밀번호입니다.
+### Response
+> **NOTE**
+>
+> 이 API는 [Common response](#common-response) 필드를 함께 반환합니다. 해당 항목을 참고하십시오.
+### 성공 예제:
+```json
+{
+  "error": "",
+  "message": "",
+  "rescode": 200
+}
+```
+### 실패 예제:
+```json
+{
+  "error": "INVALID_EMAIL",
+  "message": "Given user email was invalid",
+  "rescode": 900
+}
+```
+
+## 아바타 생성 POST /avatars
+Request 받은 이메일, 닉네임, 한 줄 소개, 역할, 아바타를 이용하여 아바타를 생성합니다. 아바타 생성이 성공하면 200 OK를 반환하고 아바타 생성 중 발생한 오류는 response 객체의 error, message 필드에 나타납니다.
+### Request parameters
+| Parameter | Type | Description
+|--|--|--
+| Apim-key(header) | string | Azure API Management 구독 키입니다. 이 필드는 Test API를 실행할 때만 필요합니다.
+| email(body) | string | 아바타 생성을 수행하는 사용자 이메일입니다.
+| nickname(body) | string | 아바타 생성을 수행하는 사용자 닉네임입니다.
+| simpleIntroduce(body) | string | 아바타 생성을 수행하는 사용자 한 줄 소개입니다.
+| position(body) | number | 아바타 생성을 수행하는 사용자 역할입니다.
+| avatarId(body) | number | 아바타 생성을 수행하는 사용자 아바타입니다.
+### Response
+> **NOTE**
+>
+> 이 API는 [Common response](#common-response) 필드를 함께 반환합니다. 해당 항목을 참고하십시오.
+### 성공 예제:
+```json
+{
+  "error": "",
+  "message": "",
+  "rescode": 200
+}
+```
+### 실패 예제:
+```json
+{
+  "error": "INVALID_EMAIL",
+  "message": "Given user email was invalid",
+  "rescode": 900
+}
+```
 
 ## 사용자 이메일 인증 POST /auth/email-verification
 Request 받은 JWT(token)을 이용해 사용자 이메일 인증을 수행합니다. 인증이 성공적으로 수행되면 200 OK를 반환하며, 인증 중 발생한 오류는 response 객체의 error, message 필드에 나타납니다. [Common response](#common-response) 필드를 참고하십시오.
@@ -56,7 +113,7 @@ Request 받은 JWT(token)을 이용해 사용자 이메일 인증을 수행합�
 }
 ```
 
-## 사용자 로그인 POST /auth/logIn
+## 사용자 로그인 POST /auth
 Request 받은 아이디(email), 비밀번호(password)를 이용해 사용자 로그인을 수행합니다. 로그인이 성공적으로 수행되면 200 OK를 반환하며, 로그인 중 발생한 오류는 response 객체의 error, message 필드에 나타납니다. [Common response](#common-response) 필드를 참고하십시오.
 ### Request parameters
 | Parameter | Type | Description
@@ -101,7 +158,7 @@ Request 받은 아이디(email), 비밀번호(password)를 이용해 사용자 �
 }
 ```
 
-## 사용자 이메일 재전송 POST /auth/resend-email
+## 사용자 이메일 재전송 POST /resend-email
 Request 받은 아이디(email), JWT(token)을 이용해 사용자 이메일 재전송을 수행합니다. email를 request로 받았을 경우 비밀번호 초기화 이메일을 재전송하며, JWT를 받았을 경우 이메일 인증 메일을 재전송합니다. 이메일 재전송이 성공적으로 수행되면 200 OK를 반환하며, 재전송 중 발생한 오류는 response 객체의 error, message 필드에 나타납니다. [Common response](#common-response) 필드를 참고하십시오.
 ### Request parameters
 | Parameter | Type | Description
@@ -130,14 +187,13 @@ Request 받은 아이디(email), JWT(token)을 이용해 사용자 이메일 재
 }
 ```
 
-## 사용자 비밀번호 변경 POST /auth/reset-password
-Request 받은 아이디(email), 비밀번호(password)를 이용해 사용자 비밀번호 변경을 수행합니다. 비밀번호 변경이 성공적으로 수행되면 200 OK를 반환하며, 초기화 중 발생한 오류는 response 객체의 error, message 필드에 나타납니다. [Common response](#common-response) 필드를 참고하십시오.
+## 비밀번호 변경 이메일 전송 POST /auth/change-password/email
+Request 받은 아이디(email)를 이용해 비밀번호 변경 이메일을 전송합니다. 이메일 전송이 성공적으로 수행되면 200 OK를 반환하며, 이메일 전송 중 발생한 오류는 response 객체의 error, message 필드에 나타납니다. [Common response](#common-response) 필드를 참고하십시오.
 ### Request parameters
 | Parameter | Type | Description
 |--|--|--
 | Apim-key(header) | string | Azure API Management 구독 키입니다. 이 필드는 Test API를 실행할 때만 필요합니다.
 | email(body) | string | 비밀번호 변경을 수행하는 사용자 이메일입니다.
-| password(body) | string | 비밀번호 변경을 수행하는 사용자 비밀번호입니다.
 ### Response
 > **NOTE**
 >
@@ -154,12 +210,12 @@ Request 받은 아이디(email), 비밀번호(password)를 이용해 사용자 �
 ```json
 {
   "error": "INVALID_EMAIL",
-  "message": "Given password reset email was expired",
+  "message": "Given user email was invalid",
   "rescode": 900
 }
 ```
 
-## 사용자 회원가입 POST /auth/join
+## 사용자 회원가입 POST /auth/register
 Request 받은 아이디(email), 비밀번호(password), 약관(termsAndConditions, personalInformationTerms, newsTerms)을 이용해 사용자 회원가입을 수행합니다. 회원가입이 성공적으로 수행되면 200 OK를 반환하며, 회원가입 수행 중 발생한 오류는 response 객체의 error, message 필드에 나타납니다. [Common response](#common-response) 필드를 참고하십시오.
 ### Request parameters
 | Parameter | Type | Description
