@@ -1,6 +1,6 @@
-import * as sqlInit from 'serverless-mysql';
-const mysql = sqlInit();
+import sqlInit from 'serverless-mysql';
 
+const mysql = sqlInit();
 mysql.config({
   host: process.env.MYSQL_HOST,
   user: process.env.MYSQL_USER,

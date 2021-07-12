@@ -6,12 +6,13 @@
       "direction": "in",
       "name": "req",
       "methods": ["post"],
-      "route": "signUp"
+      "route": "/auth/register"
     },
     {
       "type": "http",
       "direction": "out",
       "name": "res"
     }
-  ]
+  ],
+  "scriptFile": "../dist/signUp/index.js"
 }

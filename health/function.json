@@ -5,8 +5,7 @@
       "type": "httpTrigger",
       "direction": "in",
       "name": "req",
-      "methods": ["post"],
-      "route": "/auth/email-verification"
+      "methods": ["get"]
     },
     {
       "type": "http",
@@ -14,5 +13,5 @@
       "name": "res"
     }
   ],
-  "scriptFile": "../dist/emailVerification/index.js"
+  "scriptFile": "../dist/health/index.js"
 }

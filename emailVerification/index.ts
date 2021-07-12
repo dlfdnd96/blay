@@ -1,95 +1,110 @@
-import { HttpRequest, Context } from '@azure/functions'
+import { Context, HttpRequest } from '@azure/functions';
+import { ServerlessMysql } from 'serverless-mysql';
+
 import { mysql } from '../database';
+import * as PlaybusRes from '../Shared/resObj';
 import { authenticateJWT } from '../Shared/security/jwtProvider';
-import { CustomError } from '../Shared/middleware/errorHandler';
-import * as PlayBusResposne from '../Shared/resObj';
+
+interface UserInformation {
+  readonly email: string;
+  readonly verified: string;
+  readonly created_date: string;
+}
 
 const MS_SECONDS_IN_A_DAY = 86400000;
 const VERIFIED = 'Y';
 
-// TODO: 좀 더 멋지게
-interface UserInformation {
-  id: number;
-}
-interface User {
-  email: string;
-  verified: string;
-  created_date: string;
-}
-interface MySQL {
-  affectedRows: number;
-}
+const getUserInfoQuery = `SELECT email, verified, created_date
+FROM Accounts
+WHERE email = ?`;
+const updateVerifiedQuery = `UPDATE Accounts
+SET verified = 'Y'
+WHERE email = ?`;
+const get24hResetEmailCountQuery = `SELECT email, COUNT(email) AS count
+FROM ResetPasswordAccounts
+WHERE email = ?
+AND created_date BETWEEN DATE_ADD(NOW(), INTERVAL -1 DAY) AND NOW()`;
 
-const updateVerified = async (email: string) => {
-  const updateVerifiedQuery = `UPDATE Accounts
-  SET verified = 'Y'
-  WHERE email = ?`;
-  await mysql.transaction()
+/**
+ * Update verified
+ * @param {Object} db Mysql
+ * @param {string} email Plan email text
+ */
+const updateVerified = async (db: ServerlessMysql, email: string) => {
+  await db.transaction()
     .query(updateVerifiedQuery, email)
-    .query((row: MySQL) => {
-      if (row.affectedRows < 1) {
-        throw new CustomError(500, 'INTERNAL_SERVER_ERROR', 500, 'SQL execute error');
-      }
-    })
     .commit();
 };
 
-const getUserInfo = async (id: number): Promise<object> => {
-  const getUserInfoQuery = `SELECT email, verified, created_date
-  FROM Accounts
-  WHERE id = ?`;
-  const queryResult: Array<object> = await mysql.query(getUserInfoQuery, id);
+/**
+ * Check if email was expired
+ * @param {string} userCreatedDate Date the user signed up
+ * @returns {boolean} True if expired email
+ */
+const isExpiredEmail = (userCreatedDate: string): boolean => {
+  const expiredTime = new Date(userCreatedDate).getTime() + MS_SECONDS_IN_A_DAY;
+  const currentTime = new Date().getTime();
+  return currentTime > expiredTime;
+};
+
+/**
+ * Check that whether there is a resent email
+ * @param {Object} db MySQL
+ * @param {string} email Plan email text
+ * @returns True when there is not a resent email in 24h
+ */
+const isNotEmailResendIn24h = async (db: ServerlessMysql, email: string) => {
+  const queryResult: {
+    readonly count: number
+  }[] = await db.query(get24hResetEmailCountQuery, email);
+  if (queryResult[0].count > 0) {
+    return false;
+  }
+
+  return true;
+};
+
+/**
+ * Get user information
+ * @param {object} db Mysql
+ * @param {string} email Plan email
+ * @returns {object} Processing result
+ */
+const getUserInfo = async (db: ServerlessMysql, email: string) => {
+  const queryResult: UserInformation[] = await db.query(getUserInfoQuery, email);
   return queryResult[0];
 };
 
-const doEmailVerification = async (req: HttpRequest) => {
-  const decodedToken: string | object = authenticateJWT(req);
-  const { id }: UserInformation = decodedToken as UserInformation;
-
-  await mysql.connect();
-  const user: User = await getUserInfo(id) as User;
-  if (!user) {
-    mysql.quit();
-    throw new CustomError(403, 'NOT_A_MEMBER', 900, 'Given user was not a member');
-  }
-  if (user.verified === VERIFIED) {
-    mysql.quit();
-    throw new CustomError(403, 'ALREADY_VERIFIED', 900, 'Given user already verified');
-  }
-  // 유효시간 지났는지 확인
-  // TODO: 함수화 하기
-  const expiredTime: number = new Date(user.created_date).getTime() + MS_SECONDS_IN_A_DAY;
-  const currentTime: number = new Date().getTime();
-  if (currentTime > expiredTime) {
-    mysql.quit();
-    throw new CustomError(403, 'INVALID_VERIFICATION', 900, 'Given verification was expired');
-  }
-
-  await updateVerified(user.email);
-  mysql.quit();
-}
-
-const emailVerification = async (context: Context, req: HttpRequest) => {
+export default async (context: Context, req: HttpRequest): Promise<void> => {
   try {
-    await doEmailVerification(req);
-  } catch (e) {
-    //TODO: 응답처리 고치기
-    if (e.shortErrorMessage === 'NOT_A_MEMBER') {
-      context.res = PlayBusResposne.USER.NOT_A_MEMBER;
-    } else if (e.shortErrorMessage === 'ALREADY_VERIFIED') {
-      context.res = PlayBusResposne.VERIFICATION.ALREADY_VERIFIED;
-    } else if (e.shortErrorMessage === 'INVALID_VERIFICATION') {
-      context.res = PlayBusResposne.VERIFICATION.INVALID;
-    } else {
-      context.res = PlayBusResposne.ERROR.INTERNAL;
+    const decodedToken = authenticateJWT(req) as Record<string, unknown>;
+    await mysql.connect();
+    const user: UserInformation = await getUserInfo(mysql, decodedToken.sub as string);
+    if (!user) {
+      context.res = PlaybusRes.ERROR_RESPONSE.USER_NOT_A_MEMBER;
+      return;
+    }
+    if (user.verified === VERIFIED) {
+      context.res = PlaybusRes.ERROR_RESPONSE.VERIFICATION_ALREADY_VERIFIED;
+      return;
+    }
+    if (await isNotEmailResendIn24h(mysql, user.email) && isExpiredEmail(user.created_date)) {
+      context.res = PlaybusRes.ERROR_RESPONSE.VERIFICATION_INVALID;
+      return;
     }
 
-    context.done();
+    await updateVerified(mysql, user.email);
+    await mysql.end();
+  } catch (e) {
+    if (mysql.getClient()) {
+      await mysql.end();
+    }
+
+    context.log.error('[emailVerification] Unusual error case');
+    context.log.error(e);
+    context.res = PlaybusRes.getUnusualErrorResponse(e);
     return;
   }
 
-  context.res = PlayBusResposne.SUCCESS.DEFAULT;
-  context.done();
+  context.res = PlaybusRes.SUCCESS.DEFAULT;
 };
-
-export default emailVerification;

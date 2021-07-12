@@ -8,12 +8,13 @@
       "methods": [
         "post"
       ],
-      "route": "resetPassword"
+      "route": "auth/change-password/email"
     },
     {
       "type": "http",
       "direction": "out",
       "name": "res"
     }
-  ]
+  ],
+  "scriptFile": "../dist/sendChangePasswordEmail/index.js"
 }

@@ -2,121 +2,152 @@
  * @author slow_bear
  * @fileoverview Processing resend email
  */
-import { Context, HttpRequest } from "@azure/functions"
+import { AzureFunction, Context, HttpRequest } from '@azure/functions';
+import { ServerlessMysql } from 'serverless-mysql';
+import { mysql } from '../database';
+import * as playBusResponse from '../Shared/resObj';
+import { sendEmail, ResendEmailCategory, CATEGORY } from './email';
+import { authenticateJWT } from '../Shared/security/jwtProvider';
+import { emailRegex } from '../Shared/utils';
 
-const mysql = require('../database');
-const { createResponse } = require('../Shared/utils');
-const { CustomError } = require('../Shared/middleware/errorHandler');
-const { sendEmail } = require('./email');
-const { authenticateJWT } = require('../Shared/security/jwtProvider');
+// serverless-mysql용 임시 type
+interface OkPacket {
+  fieldCount: number;
+  affectedRows: number;
+  insertId: number;
+  serverStatus: number;
+  warningCount: number;
+  message: string;
+  protocol41: boolean;
+  changedRows: number;
+}
 
-const getErrorResponse = async (error) => {
-  if (error instanceof CustomError) {
-    return createResponse(error.status, error.error, error.message, error.rescode);
+const getUserEmailByEmailQuery = `SELECT email
+ FROM Accounts
+ WHERE email = ?`;
+const insertResetEmailQuery = `INSERT INTO ResetPasswordAccounts (email, created_date)
+VALUES (?, NOW())`;
+const get24hResetEmailCountQuery = `SELECT email, COUNT(email) AS count
+FROM ResetPasswordAccounts
+WHERE email = ?
+AND created_date BETWEEN DATE_ADD(NOW(), INTERVAL -1 DAY) AND NOW()`;
+
+const getUserEmailByEmail = async (db: ServerlessMysql, email: string) => {
+  interface QueryResult {
+    email: string | undefined;
   }
+  const selectQueryResult: QueryResult[] = await db.query(getUserEmailByEmailQuery, email);
 
-  return createResponse(500, 'INTERNAL_SERVER_ERROR', error.message, 500);
-};
-
-const getSuccessResponse = async () => createResponse(200, '', '', 200);
-
-/**
-  * Get count of requesting reset email in 24 hours
-  * @param {string} email Plane email text
-  * @returns {Array} Processing result
-  */
-const get24hResetEmailCount = async (email) => {
-  const get24hResetEmailCountQuery = `SELECT email, COUNT(email) AS count
-  FROM ResetPasswordAccounts
-  WHERE email = ?
-  AND created_date BETWEEN DATE_ADD(NOW(), INTERVAL -1 DAY) AND NOW()`;
-  const queryResult = await mysql.query(get24hResetEmailCountQuery, email);
-  return queryResult;
+  return selectQueryResult[0]?.email;
 };
 
 /**
-  * Insert user's reset email
-  * @param {string} email Plane email text
-  */
-const insertResetEmailAccount = async (email) => {
-  const insertResetEmailQuery = `INSERT INTO ResetPasswordAccounts (email, created_date)
-  VALUES (?, NOW())`;
-  await mysql.transaction()
-    .query(insertResetEmailQuery, email)
-    .query((row) => {
-      if (row.affectedRows < 1) {
-        throw new CustomError(500, 'INTERNAL_SERVER_ERROR', 500, 'SQL execute error');
-      }
-    })
-    .commit();
-};
-
-/**
-  * Send password reset email
-  * @param {string} email Plane email text
-  */
-const sendPasswordResetEmail = async (email) => {
-  // 24시간안에 3번 이상 보냈는지 확인
-  const resetEmail = await get24hResetEmailCount(email);
-  if (resetEmail.length > 0 && resetEmail[0].count >= 3) {
-    throw new CustomError(403, 'INVALID_DEMAND', 900, 'Too many attempts to reset your password', 900);
-  }
-
-  const passwordResetCategory = 'password_reset';
-  await sendEmail(email, passwordResetCategory);
-  await insertResetEmailAccount(email);
-};
-
-/**
- * Get user information
- * @param {number} id Plane user id number
- * @returns {object} Processing result
+ * Insert user's reset email
+ * @param {object} db Mysql
+ * @param {string} email Plane email text
  */
-const getUserEmail = async (id) => {
-  const getUserEmailQuery = `SELECT email
-  FROM Accounts
-  WHERE id = ?`;
-  const queryResult = await mysql.query(getUserEmailQuery, id);
-  return queryResult[0];
+const insertResetEmailAccount = async (db: ServerlessMysql, email: string) => {
+  const insertQueryResult: OkPacket = await db.query(insertResetEmailQuery, email);
+
+  if (insertQueryResult.affectedRows < 1) {
+    throw new Error('insert failed');
+  }
+
+  return insertQueryResult;
 };
 
 /**
- * Send verification email
- * @param {number} id Plane user id number
+ * Get count of requesting reset email in 24 hours
+ * @param {object} db Mysql
+ * @param {string} email Plane email text
+ * @returns {Array} Processing result
  */
-const sendVerificationEmail = async (id) => {
-  const user = await getUserEmail(id);
-  if (!user) {
-    throw new CustomError(403, 'NOT_A_MEMBER', 900, 'Given user was not a member');
+const get24hResetEmailCount = async (db: ServerlessMysql, email: string) => {
+  interface QueryResult {
+    email: string;
+    count: number;
   }
+  const queryResult: QueryResult[] = await db.query(get24hResetEmailCountQuery, email);
 
-  const verificationCategory = 'verification';
-  await sendEmail(user.email, verificationCategory);
+  return queryResult[0].count;
 };
 
-module.exports = async (context: Context, req: HttpRequest) => {
-  // TODO: 여기부터
-  const isPasswordReset = (token) => token === undefined;
-  const disconnectMysql = async () => mysql.quit();
+/**
+ * Send password reset email
+ * @param {string} email Plane email text
+ * @returns {Array} Response result
+ */
+const sendPasswordResetEmail = async (email: string) => {
+  const result = await sendEmail(email, 'PASSWORD_RESET');
+
+  await insertResetEmailAccount(mysql, email);
+
+  return result;
+};
+
+const resendEmail: AzureFunction = async (context: Context, req: HttpRequest) => {
+  interface RequestBody {
+    category: ResendEmailCategory;
+    email: string;
+  }
+  const { category, email } = req.body as RequestBody;
+
   try {
-    if (isPasswordReset(req.body.token)) {
-      const { email } = req.body;
+    // Validation check
+    if (!emailRegex(email)) {
+      context.res = playBusResponse.ERROR_RESPONSE.EMAIL_INVALID;
+      return context.done();
+    }
+    if (!Object.keys(CATEGORY).includes(category)) {
+      context.res = playBusResponse.ERROR_RESPONSE.INVALID_CATEGORY;
+      return context.done();
+    }
+
+    // Business logic start
+    if (category === 'PASSWORD_RESET') {
+      const userEmail = await getUserEmailByEmail(mysql, email);
+
+      if (!userEmail) {
+        await mysql.end();
+
+        context.res = playBusResponse.ERROR_RESPONSE.USER_NOT_A_MEMBER;
+        return context.done();
+      }
+
+      // 24시간안에 3번 이상 보냈는지 확인
+      const sendEmailCount = await get24hResetEmailCount(mysql, email);
+
+      if (sendEmailCount >= 3) {
+        context.res = playBusResponse.ERROR_RESPONSE.PASSWORD_INVALID_DEMAND;
+        return context.done();
+      }
       await sendPasswordResetEmail(email);
-    } else {
-      const decodedToken = await authenticateJWT(req);
-      const { id } = decodedToken;
-      await sendVerificationEmail(id);
     }
 
-    await disconnectMysql();
-  } catch (e) {
-    if (mysql.getClient()) {
-      await disconnectMysql();
+    if (category === 'VERIFICATION_EMAIL') {
+      const decodedToken = authenticateJWT(req) as Record<string, any>; // 임시
+
+      const userEmail = await getUserEmailByEmail(mysql, decodedToken.sub);
+
+      if (!userEmail) {
+        await mysql.end();
+
+        context.res = playBusResponse.ERROR_RESPONSE.USER_NOT_A_MEMBER;
+        return context.done();
+      }
+
+      await sendEmail(userEmail, 'VERIFICATION_EMAIL');
     }
 
-    context.res = await getErrorResponse(e);
-    return;
+    await mysql.end();
+
+    context.res = playBusResponse.SUCCESS.DEFAULT;
+    return context.done();
+  } catch (error) {
+    context.log.error('[resendEmail] Unusual error case', error);
+    context.res = playBusResponse.getUnusualErrorResponse(error);
+    return context.done();
   }
-
-  context.res = await getSuccessResponse();
 };
+
+export default resendEmail;

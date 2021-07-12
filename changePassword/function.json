@@ -5,8 +5,10 @@
       "type": "httpTrigger",
       "direction": "in",
       "name": "req",
-      "methods": ["post"],
-      "route": "/auth/email-verification"
+      "methods": [
+        "put"
+      ],
+      "route": "auth/change-password"
     },
     {
       "type": "http",
@@ -14,5 +16,5 @@
       "name": "res"
     }
   ],
-  "scriptFile": "../dist/emailVerification/index.js"
+  "scriptFile": "../dist/changePassword/index.js"
 }
